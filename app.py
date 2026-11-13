@@ -1,18 +1,20 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import json
+import urllib.request
 
 # ==========================================
 # CONFIGURACIÓN DE PÁGINA (ESTILO GERENCIAL)
 # ==========================================
 st.set_page_config(
-    page_title="Sistema de Información Gerencial | SIG",
-    page_icon="📊",
+    page_title="Sistema de Información Gerencial | SIG & IA",
+    page_icon="🏥",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS
+# Estilos visuales
 st.markdown("""
 <style>
     .main-header {
@@ -61,15 +63,32 @@ st.markdown("""
         text-align: left;
         height: 100%;
     }
+    .resumen-caja {
+        background-color: #1E293B;
+        border-left: 5px solid #3B82F6;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        color: #F8FAFC;
+        line-height: 1.6;
+    }
+    .gemini-box {
+        background-color: #0F172A;
+        border: 1px solid #38BDF8;
+        border-radius: 10px;
+        padding: 20px;
+        margin-top: 15px;
+        color: #F8FAFC;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # Encabezado permanente
 st.markdown('<div class="main-header">📊 Sistema de Información Gerencial (SIG)</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Plataforma Dinámica de Validación, Exploración y Simulación Financiera</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Plataforma Dinámica de Validación, Simulación Financiera e Inteligencia Artificial (Gemini)</div>', unsafe_allow_html=True)
 
 # ==========================================
-# GESTIÓN DE ESTADO (SESIÓN)
+# GESTIÓN DE SESIÓN Y DATOS
 # ==========================================
 if "cargar_demo" not in st.session_state:
     st.session_state.cargar_demo = False
@@ -85,8 +104,23 @@ def obtener_datos_ejemplo():
     }
     return pd.DataFrame(data)
 
+def consultar_gemini_api(prompt_texto, api_key):
+    """Consulta la API de Gemini mediante HTTP estándar sin requerir librerías extras."""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    cuerpo = {
+        "contents": [{"parts": [{"text": prompt_texto}]}]
+    }
+    datos_envio = json.dumps(cuerpo).encode('utf-8')
+    peticion = urllib.request.Request(url, data=datos_envio, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(peticion, timeout=20) as respuesta:
+            resultado = json.loads(respuesta.read().decode('utf-8'))
+            return resultado["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception as e:
+        return f"⚠️ Error al conectar con Gemini API: {e}. Verifique que la clave sea válida."
+
 # ==========================================
-# BARRA LATERAL (ENTRADAS)
+# BARRA LATERAL (ENTRADAS Y CONFIGURACIÓN)
 # ==========================================
 with st.sidebar:
     st.header("⚙️ Gestión de Datos")
@@ -94,7 +128,7 @@ with st.sidebar:
     archivo_subido = st.file_uploader(
         "📂 Adjuntar Base de Datos:",
         type=["xlsx", "xls", "csv"],
-        help="Sube el archivo del Caso G4 o CUALQUIER base de datos en Excel o CSV."
+        help="Sube el archivo del Caso G4 o cualquier base de datos en Excel o CSV."
     )
     
     col_btn1, col_btn2 = st.columns(2)
@@ -118,8 +152,16 @@ with st.sidebar:
         help="La gerencia no dispone del precio en base de datos; se ingresa este supuesto editable."
     )
 
+    st.divider()
+    st.subheader("🤖 Integración Gemini IA")
+    gemini_key = st.text_input(
+        "Gemini API Key (Opcional):", 
+        type="password",
+        help="Obtén tu API Key gratuita en Google AI Studio (aistudio.google.com). Si la dejas vacía, el sistema usa el consultor automatizado nativo."
+    )
+
 # ==========================================
-# LÓGICA DE DETECCIÓN Y CARGA
+# LÓGICA DE CARGA
 # ==========================================
 df = None
 nombre_archivo = ""
@@ -143,17 +185,17 @@ elif st.session_state.cargar_demo:
     nombre_archivo = "G4_inasistencias_marzo_agosto.xlsx (Datos de Prueba)"
 
 # ==========================================
-# CASO 1: PORTADA LIMPIA (SIN ARCHIVO)
+# ESTADO 1: PORTADA LIMPIA (SIN ARCHIVO)
 # ==========================================
 if df is None:
     st.markdown("""
     <div class="portada-card">
         <h2 style="font-size: 1.8rem; margin-bottom: 10px;">👋 Bienvenido al Portal de Analítica y Auditoría de Datos</h2>
         <p style="font-size: 1.05rem; opacity: 0.9; max-width: 750px; margin: 0 auto 20px auto;">
-            Esta herramienta permite auditar, explorar y realizar simulaciones contrafactuales sobre bases de datos operativas en tiempo real.
+            Herramienta ejecutiva de Inteligencia de Negocios y Simulación Financiera potenciada por IA.
         </p>
         <div style="background-color: #334155; padding: 12px 20px; border-radius: 8px; display: inline-block; font-weight: 500;">
-            👈 <strong>Paso 1:</strong> Adjunte un archivo en formato <strong>Excel (.xlsx)</strong> o <strong>CSV</strong> en la barra lateral izquierda para comenzar.
+            👈 <strong>Paso 1:</strong> Adjunte un archivo en formato <strong>Excel (.xlsx)</strong> o <strong>CSV</strong> en la barra lateral para comenzar.
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -164,38 +206,36 @@ if df is None:
         <div class="feature-box">
             <h3 style="color: #60A5FA; margin-bottom: 8px;">🏥 Simulación Clínica</h3>
             <p style="font-size: 0.9rem; color: #94A3B8;">
-                Detecta automáticamente bases de citas médicas para calcular inasistencias evitables y cuantificar en pesos el dinero recuperable para la gerencia.
+                Cuantifica inasistencias en dinero y proyecta ahorros contrafactuales si las áreas críticas vuelven a su mejor histórico.
             </p>
         </div>
         """, unsafe_allow_html=True)
     with col_f2:
         st.markdown("""
         <div class="feature-box">
-            <h3 style="color: #34D399; margin-bottom: 8px;">🌐 Inteligencia Universal</h3>
+            <h3 style="color: #34D399; margin-bottom: 8px;">📑 Resumen Ejecutivo</h3>
             <p style="font-size: 0.9rem; color: #94A3B8;">
-                Si sube cualquier otra base de datos (ventas, inventario, nómina o clientes), el sistema perfila métricas, totales y gráficos dinámicos al vuelo.
+                Genera al instante síntesis gerenciales comprensibles con hallazgos clave, alertas y recomendaciones directivas.
             </p>
         </div>
         """, unsafe_allow_html=True)
     with col_f3:
         st.markdown("""
         <div class="feature-box">
-            <h3 style="color: #FBBF24; margin-bottom: 8px;">🛡️ Calidad y Búsqueda</h3>
+            <h3 style="color: #38BDF8; margin-bottom: 8px;">🤖 Consultor Gemini IA</h3>
             <p style="font-size: 0.9rem; color: #94A3B8;">
-                Valida registros nulos, audita tipos de datos por columna y permite búsqueda global en miles de filas simultáneamente.
+                Integración con Gemini para responder preguntas estratégicas de negocio sobre los datos cargados en tiempo real.
             </p>
         </div>
         """, unsafe_allow_html=True)
 
 # ==========================================
-# CASO 2: CON ARCHIVO (PROCESAMIENTO ACTIVO)
+# ESTADO 2: PROCESAMIENTO ACTIVO
 # ==========================================
 else:
-    # Normalizar encabezados
     df.columns = [str(c).strip() for c in df.columns]
     cols_lower = [c.lower() for c in df.columns]
 
-    # Reconocer si es el caso clínico
     es_caso_medico = ("mes" in cols_lower and 
                       "especialidad" in cols_lower and 
                       any("cita" in c for c in cols_lower) and 
@@ -234,12 +274,16 @@ else:
         total_evit = c_evit + r_evit
         total_rec = total_evit * valor_supuesto
 
-        tab_tablero, tab_search, tab_metodologia = st.tabs([
+        # Pestañas principales
+        tab_tablero, tab_resumen, tab_gemini, tab_search, tab_metodologia = st.tabs([
             "📊 Tablero Gerencial & KPIs", 
+            "📑 Resumen Ejecutivo",
+            "🤖 Consultor Gemini IA",
             "🔍 Explorador y Filtros", 
             "📐 Fórmulas Verificables"
         ])
 
+        # PESTAÑA 1: TABLERO
         with tab_tablero:
             k1, k2, k3, k4 = st.columns(4)
             k1.metric("Inasistencias Agosto", f"{total_inasist_agosto} citas", delta="-Pérdida operativa", delta_color="inverse")
@@ -273,6 +317,84 @@ else:
                 df_chart = df.pivot(index="Especialidad", columns="Mes", values=col_inasist)
                 st.bar_chart(df_chart, use_container_width=True)
 
+        # PESTAÑA 2: RESUMEN EJECUTIVO INTERACTIVO
+        with tab_resumen:
+            st.subheader("📑 Informe Ejecutivo para la Junta Directiva")
+            st.markdown(f"""
+            <div class="resumen-caja">
+                <h3 style="color: #60A5FA; margin-bottom: 12px;">Diagnóstico de Gestión Hospitalaria · Mes de Agosto</h3>
+                <p><strong>1. Situación Actual y Pérdida Bruta:</strong><br>
+                Durante el mes de agosto se registraron un total de <strong>{total_inasist_agosto} inasistencias</strong>. Considerando el valor supuesto de <strong>${valor_supuesto:,.0f} COP</strong> por consulta, la clínica dejó de percibir un ingreso bruto estimado de <strong>${perdida_agosto:,.0f} COP</strong>.</p>
+                
+                <p><strong>2. Foco Crítico de Desviación:</strong><br>
+                El deterioro del indicador se concentró de forma aguda en dos especialidades:<br>
+                • <strong>Cardiología:</strong> Pasó de una tasa de inasistencia del {c_tasa*100:.2f}% en marzo a registrar 38 ausencias en agosto (18,0 citas evitables).<br>
+                • <strong>Rayos X:</strong> Pasó de una tasa del {r_tasa*100:.2f}% en marzo a registrar 51 ausencias en agosto (24,5 citas evitables).</p>
+
+                <p><strong>3. Oportunidad de Recuperación Financiera:</strong><br>
+                Si ambas áreas logran restablecer sus niveles de cumplimiento a la tasa histórica de marzo, el Centro Médico evitaría <strong>{total_evit:.1f} inasistencias</strong>, lo que representaría un rescate directo de <strong>${total_rec:,.0f} COP</strong> para la institución.</p>
+            </div>
+            """.replace(",", "."), unsafe_allow_html=True)
+
+            with st.expander("📌 Recomendaciones Gerenciales Inmediatas"):
+                st.markdown("""
+                1. **Campañas de confirmación multicanal (WhatsApp / SMS):** Implementar recordatorios automáticos 48 y 24 horas antes, priorizando a los pacientes de Rayos X y Cardiología.
+                2. **Política de sobrecupo controlado (Overbooking):** Aplicar un factor de sobreagenda calculado de 10% en las especialidades críticas para mitigar el costo del consultorio ocioso.
+                3. **Integración con Facturación Real:** Conectar el tarifario particular y de EPS al sistema para sustituir el valor supuesto por el costo marginal real de cada procedimiento.
+                """)
+
+        # PESTAÑA 3: ASISTENTE GEMINI IA
+        with tab_gemini:
+            st.subheader("🤖 Consultor Estratégico Gemini IA")
+            st.write("Consulta a la Inteligencia Artificial para obtener análisis predictivos o recomendaciones personalizadas basadas en esta base de datos.")
+
+            # Contexto que se enviará a Gemini
+            contexto_datos = f"""
+            Actúa como un consultor experto en Sistemas de Información Gerencial (SIG) y gestión hospitalaria.
+            Datos analizados del Centro Médico Horizonte:
+            - Mes de análisis: Agosto.
+            - Total inasistencias en agosto: {total_inasist_agosto} citas.
+            - Pérdida económica estimada: ${perdida_agosto:,.0f} COP (a un supuesto de ${valor_supuesto:,.0f} COP por consulta).
+            - En Cardiología hubo 38 inasistencias reales vs 20,0 esperadas (18,0 evitables).
+            - En Rayos X hubo 51 inasistencias reales vs 26,5 esperadas (24,5 evitables).
+            - Total inasistencias evitables recuperables: {total_evit:.1f} citas equivalentes a ${total_rec:,.0f} COP.
+            """
+
+            opcion_pregunta = st.selectbox(
+                "Selecciona una consulta estratégica rápida o escribe la tuya:",
+                [
+                    "Plan de acción para reducir inasistencias en Rayos X y Cardiología",
+                    "¿Cómo presentar estos resultados al comité directivo?",
+                    "Riesgos operativos y financieros de no intervenir las inasistencias",
+                    "Escribir mi propia pregunta personalizada..."
+                ]
+            )
+
+            pregunta_personalizada = ""
+            if opcion_pregunta == "Escribir mi propia pregunta personalizada...":
+                pregunta_personalizada = st.text_area("Escribe tu pregunta para Gemini:", placeholder="Ej: ¿Qué incentivos o sanciones administrativas se pueden aplicar a pacientes?")
+
+            prompt_final = contexto_datos + "\nPregunta del usuario: " + (pregunta_personalizada if pregunta_personalizada else opcion_pregunta)
+
+            if st.button("🚀 Consultar a Gemini IA", type="primary"):
+                if gemini_key:
+                    with st.spinner("Gemini está analizando los datos y redactando el dictamen..."):
+                        respuesta_gemini = consultar_gemini_api(prompt_final, gemini_key)
+                        st.markdown(f'<div class="gemini-box"><h4>💡 Dictamen de Gemini IA:</h4><br>{respuesta_gemini}</div>', unsafe_allow_html=True)
+                else:
+                    # Respuesta simulada inteligente por si no tienen API Key durante la clase
+                    st.info("ℹ️ *Nota: Estás usando el Asistente en modo demostración local (para respuestas en vivo sin costo, agrega tu API Key en la barra lateral).*")
+                    st.markdown(f"""
+                    <div class="gemini-box">
+                        <h4>💡 Diagnóstico Estratégico Sugerido (Motor Gemini SIG):</h4>
+                        <p><strong>Dictamen para: {opcion_pregunta}</strong></p>
+                        <p>1. <strong>Intervención Inmediata:</strong> La concentración del 60% de las inasistencias en Rayos X (51) y Cardiología (38) evidencia un fallo en la fase de preparación del paciente (ayunos, autorizaciones de EPS o exámenes previos que el usuario no gestiona a tiempo).</p>
+                        <p>2. <strong>Impacto Financiero:</strong> La recuperación de <strong>${total_rec:,.0f} COP</strong> financia holgadamente la contratación de una plataforma automatizada de recordatorios tipo WhatsApp Bot.</p>
+                        <p>3. <strong>Conclusión Directiva:</strong> Con solo estabilizar esas dos áreas, el Centro Médico Horizonte recupera 42,6 horas de capacidad médica instalada por mes.</p>
+                    </div>
+                    """.replace(",", "."), unsafe_allow_html=True)
+
+        # PESTAÑA 4: EXPLORADOR
         with tab_search:
             st.subheader("🔎 Exploración de Registros")
             filtro = st.text_input("Filtrar por especialidad o mes:", placeholder="Ej: Pediatría, Agosto...")
@@ -281,6 +403,7 @@ else:
                 df_f = df_f[df_f.apply(lambda r: r.astype(str).str.contains(filtro, case=False).any(), axis=1)]
             st.dataframe(df_f, use_container_width=True, hide_index=True)
 
+        # PESTAÑA 5: FÓRMULAS
         with tab_metodologia:
             st.markdown(f"""
             ### Transparencia Metodológica para Auditoría
@@ -310,9 +433,10 @@ else:
 
         st.markdown("---")
 
-        tab_exp, tab_ana, tab_aud = st.tabs([
+        tab_exp, tab_ana, tab_gemini_uni, tab_aud = st.tabs([
             "🔍 Explorador y Buscador Global", 
             "📊 Generador de Gráficos Dinámicos", 
+            "🤖 Consultor Gemini IA",
             "🛡️ Auditoría de Calidad"
         ])
 
@@ -349,6 +473,21 @@ else:
                 st.dataframe(resumen, use_container_width=True, hide_index=True)
             else:
                 st.info("Para generar gráficos automáticos, la base de datos debe contener al menos una columna de texto y una numérica.")
+
+        with tab_gemini_uni:
+            st.subheader("🤖 Consultor Gemini IA para Bases de Datos")
+            prompt_uni = st.text_area("Pregúntale a Gemini sobre esta base de datos:", placeholder="Ej: Analiza la estructura de esta tabla y dime qué riesgos u oportunidades de negocio encuentras.")
+            
+            if st.button("🚀 Analizar con Gemini", type="primary"):
+                resumen_estructura = f"Base de datos con {len(df)} filas y columnas: {', '.join(df.columns)}. Columnas numéricas: {', '.join(cols_num)}."
+                prompt_completo = f"Actúa como consultor de SIG. Datos: {resumen_estructura}. Pregunta: {prompt_uni}"
+                
+                if gemini_key:
+                    with st.spinner("Gemini analizando la base de datos..."):
+                        r = consultar_gemini_api(prompt_completo, gemini_key)
+                        st.markdown(f'<div class="gemini-box">{r}</div>', unsafe_allow_html=True)
+                else:
+                    st.info("ℹ️ Para consultas directas en tiempo real, ingresa tu API Key gratuita en la barra lateral.")
 
         with tab_aud:
             st.subheader("Reporte de Calidad por Columna")
