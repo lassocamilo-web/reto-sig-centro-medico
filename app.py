@@ -105,19 +105,27 @@ def obtener_datos_ejemplo():
     return pd.DataFrame(data)
 
 def consultar_gemini_api(prompt_texto, api_key):
-    """Consulta la API de Gemini mediante HTTP estándar sin requerir librerías extras."""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-    cuerpo = {
-        "contents": [{"parts": [{"text": prompt_texto}]}]
-    }
-    datos_envio = json.dumps(cuerpo).encode('utf-8')
-    peticion = urllib.request.Request(url, data=datos_envio, headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(peticion, timeout=20) as respuesta:
-            resultado = json.loads(respuesta.read().decode('utf-8'))
-            return resultado["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception as e:
-        return f"⚠️ Error al conectar con Gemini API: {e}. Verifique que la clave sea válida."
+    """Consulta la API de Gemini con limpieza de clave y modelos universales."""
+    api_key_limpia = api_key.strip()
+    modelos_a_probar = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
+    ultimo_error = ""
+
+    for modelo in modelos_a_probar:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key_limpia}"
+        cuerpo = {
+            "contents": [{"parts": [{"text": prompt_texto}]}]
+        }
+        datos_envio = json.dumps(cuerpo).encode('utf-8')
+        peticion = urllib.request.Request(url, data=datos_envio, headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(peticion, timeout=25) as respuesta:
+                resultado = json.loads(respuesta.read().decode('utf-8'))
+                return resultado["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception as e:
+            ultimo_error = str(e)
+            continue
+
+    return f"⚠️ Error al conectar con Gemini API ({ultimo_error}). Verifique que la clave sea válida."
 
 # ==========================================
 # BARRA LATERAL (ENTRADAS Y CONFIGURACIÓN)
@@ -317,7 +325,7 @@ else:
                 df_chart = df.pivot(index="Especialidad", columns="Mes", values=col_inasist)
                 st.bar_chart(df_chart, use_container_width=True)
 
-        # PESTAÑA 2: RESUMEN EJECUTIVO INTERACTIVO
+        # PESTAÑA 2: RESUMEN EJECUTIVO
         with tab_resumen:
             st.subheader("📑 Informe Ejecutivo para la Junta Directiva")
             st.markdown(f"""
@@ -348,7 +356,6 @@ else:
             st.subheader("🤖 Consultor Estratégico Gemini IA")
             st.write("Consulta a la Inteligencia Artificial para obtener análisis predictivos o recomendaciones personalizadas basadas en esta base de datos.")
 
-            # Contexto que se enviará a Gemini
             contexto_datos = f"""
             Actúa como un consultor experto en Sistemas de Información Gerencial (SIG) y gestión hospitalaria.
             Datos analizados del Centro Médico Horizonte:
@@ -382,7 +389,6 @@ else:
                         respuesta_gemini = consultar_gemini_api(prompt_final, gemini_key)
                         st.markdown(f'<div class="gemini-box"><h4>💡 Dictamen de Gemini IA:</h4><br>{respuesta_gemini}</div>', unsafe_allow_html=True)
                 else:
-                    # Respuesta simulada inteligente por si no tienen API Key durante la clase
                     st.info("ℹ️ *Nota: Estás usando el Asistente en modo demostración local (para respuestas en vivo sin costo, agrega tu API Key en la barra lateral).*")
                     st.markdown(f"""
                     <div class="gemini-box">
